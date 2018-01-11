@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename compilation unit &apos;ch.MultiplayersOptionsWindow.java&apos; to &apos;MultiplayerOptionsWindow.java&apos;&#x0D;&#x0A;- Original project: &apos;ch&apos;&#x0D;&#x0A;- Original element: &apos;ch.MultiplayersOptionsWindow.java&apos;&#x0D;&#x0A;- Renamed element: &apos;ch.MultiplayerOptionsWindow.java&apos;" description="Rename compilation unit &apos;MultiplayersOptionsWindow.java&apos;" flags="2" id="org.eclipse.jdt.ui.rename.compilationunit" input="/src&lt;ch{MultiplayersOptionsWindow.java" name="MultiplayerOptionsWindow.java" references="false" stamp="1512940733137" version="1.0"/>
+</session>

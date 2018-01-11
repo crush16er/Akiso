@@ -1,0 +1,473 @@
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.swing.JPanel;
+
+
+class Surface extends JPanel {
+    List shapes = new ArrayList();
+    List<Integer> shapesTypes = new ArrayList<Integer>(); // 0-circle, 1-rect, 2-ownshape
+    int shapesCount = 0, highlightedShapeIndex = -1;
+    MasterFrame masterFrame;
+    Values v = new Values();
+    //String cMode;
+    boolean ownShapeInDrawing = false;
+    OwnShape currentOwnShape;
+    List<Line> lines = new ArrayList<Line>();
+    int linesCount = 0;
+    int startX, startY;
+    Point startDrag = null, endDrag = null;
+    
+    Surface(MasterFrame masterFrame){
+        this.shapesTypes = new ArrayList();
+        this.masterFrame = masterFrame;
+        this.setBackground(Color.WHITE);
+        this.setSize(400, 200 );
+        //cMode = masterFrame.getCurrentMode();
+        MovingAdapter ma = new MovingAdapter();
+        
+        Circle c = new Circle(new Point(150, 70), 80,Color.CYAN);
+        shapes.add(c);
+        shapesTypes.add(0);
+        shapesCount++;
+
+        addMouseMotionListener(ma);
+        addMouseListener(ma);
+        addMouseWheelListener(new ScaleHandler());
+        repaint();
+        
+    }
+    
+    public void paintAll(Graphics g){
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setBackground(Color.white);
+        Font font = new Font("Serif", Font.BOLD, 40);
+        g2d.setFont(font);
+        
+       
+        for( int i = 0; i < shapesCount; i++ ){
+            //System.out.println(shapesTypes.get(i)+" "+shapes.get(i) + " mode: "+ masterFrame.getCurrentMode());
+            if(shapesTypes.get(i) == 0){
+                Ellipse2D circle = new Ellipse2D.Double();
+                Circle c = (Circle)shapes.get(i);
+                circle.setFrame(c.getPoint().x,c.getPoint().y,c.getR(),c.getR());
+                g2d.setPaint(c.getColor());
+                if( i == highlightedShapeIndex && masterFrame.getCurrentMode() == v.MODIFY_MODE) 
+                    g2d.setPaint(Color.LIGHT_GRAY);
+                g2d.fill(circle);
+            }
+            else if(shapesTypes.get(i) == 1){
+                Rectangle2D rect = new Rectangle2D.Double();
+                Rect r = (Rect)shapes.get(i);
+                rect.setFrame(r.getPoint().x, r.getPoint().y, r.getWidth(), r.getHeight());
+                g2d.setPaint(r.getColor());
+                if( i == highlightedShapeIndex && masterFrame.getCurrentMode() == v.MODIFY_MODE) 
+                    g2d.setPaint(Color.LIGHT_GRAY);
+                g2d.fill(rect);
+            }
+            else if(shapesTypes.get(i) == 2){
+                OwnShape os = new OwnShape();
+                os = (OwnShape)shapes.get(i);
+                g2d.setPaint(os.getColor());
+                Point pointOne = new Point();
+                Point pointTwo = new Point();
+                int numPoints = os.getNumberOfPoints();
+                int[] xPoints = new int[numPoints];
+                int[] yPoints = new int[numPoints];
+                for( int j = 0; j < numPoints-1; j++){
+                    pointOne = (Point)os.getPoints().get(j);
+                    pointTwo = (Point)os.getPoints().get(j+1);
+                    g2d.drawLine(pointOne.x, pointOne.y,pointTwo.x, pointTwo.y);
+                    xPoints[j] = pointOne.x;
+                    yPoints[j] = pointOne.y;
+                }
+                g2d.drawLine(pointTwo.x, pointTwo.y, os.getBeginning().x, os.getBeginning().y);
+                xPoints[numPoints - 1 ] = pointTwo.x;
+                yPoints[numPoints - 1 ] = pointTwo.y;
+                if( i == highlightedShapeIndex && masterFrame.getCurrentMode() == v.MODIFY_MODE) 
+                    g2d.setPaint(Color.LIGHT_GRAY);
+                g2d.fillPolygon(xPoints, yPoints, numPoints);
+            }
+            
+        }
+        
+        g2d.setColor(masterFrame.getCurrentColor());
+        if(ownShapeInDrawing && currentOwnShape.getNumberOfPoints() > 0){
+            for( int k = 0; k <  linesCount; k++){
+                g2d.drawLine(lines.get(k).startX, lines.get(k).startY, lines.get(k).edndX, lines.get(k).endY);
+            }
+        }
+        
+        if(endDrag != null){
+            g2d.setPaint(Color.LIGHT_GRAY);
+            g2d.drawLine(startDrag.x, startDrag.y, endDrag.x, endDrag.y);
+            
+            if(masterFrame.getCurrentMode() == v.NEW_CIRCLE_MODE){
+                Double r = Math.sqrt((startDrag.x - endDrag.x)*(startDrag.x - endDrag.x) + (startDrag.y - endDrag.y)*(startDrag.y - endDrag.y));
+                Integer oR = r.intValue();
+                g2d.drawOval(startDrag.x - oR, startDrag.y - oR , 2*oR, 2*oR);
+            }
+            else if(masterFrame.getCurrentMode() == v.NEW_RECT_MODE){
+                int rx = startDrag.x;
+                int ry = startDrag.y;
+                int width = Math.abs(rx - endDrag.x);
+                int height = Math.abs(ry - endDrag.y);
+                if(rx > endDrag.x) rx = endDrag.x;
+                if(ry > endDrag.y) ry = endDrag.y;
+                g2d.drawRect(rx, ry, width, height);
+            }
+        }
+        
+        
+    }
+    
+    @Override
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        paintAll(g);        
+    }
+    
+    
+    
+    class MovingAdapter extends MouseAdapter {
+
+        private int x;
+        private int y;
+
+        @Override
+        public void mousePressed(MouseEvent e) {
+            
+            x = e.getX();
+            y = e.getY();
+            startDrag = new Point(x,y);
+            if(masterFrame.getCurrentMode() == v.NEW_OWN_SHAPE_MODE){
+                  if(!ownShapeInDrawing){
+                      currentOwnShape = new OwnShape();
+                      currentOwnShape.addPoint(new Point(x,y));
+                      currentOwnShape.setColor(masterFrame.getCurrentColor());
+                      ownShapeInDrawing = true;
+                  }
+                  else{
+                      if(( Math.abs(currentOwnShape.getBeginning().x - e.getX()) < 5 ) && ( Math.abs(currentOwnShape.getBeginning().y - e.getY()) < 5 ) ){
+                          shapes.add(currentOwnShape);
+                          shapesTypes.add(2);
+                          shapesCount++;
+                          currentOwnShape = new OwnShape();
+                          ownShapeInDrawing = false;
+                          modeChanged();
+                          
+                      } else{
+                          drawLine(currentOwnShape.getLastPoint(), new Point(x,y));
+                          currentOwnShape.addPoint(new Point(x,y));
+                      }
+                      repaint();
+                  }
+                       
+            }else if(masterFrame.getCurrentMode() == v.MODIFY_MODE){               
+                
+                if(highlightedShapeIndex == -1){
+                    for(int j = 0; j < shapesCount; j++ ){
+                        if(shapesTypes.get(j) == 0){        //circle
+                            Circle c = (Circle)shapes.get(j);
+                            if(c.includes(x, y)){
+                                highlightedShapeIndex = j;
+                                j = shapesCount+1;
+                                repaint();
+                                
+                            }
+                        }else if( shapesTypes.get(j) == 1){     //rect
+                            Rect re = (Rect)shapes.get(j);
+                            if(re.includes(x, y)){
+                                highlightedShapeIndex = j;
+                                j = shapesCount+1;
+                                repaint();
+                            }
+                        }else{                                  //ownshape
+                            OwnShape ow = (OwnShape)shapes.get(j);
+                            if(ow.includes(x, y)){
+                                highlightedShapeIndex = j;
+                                j = shapesCount+1;
+                                repaint();
+                            }
+                        }
+                    }
+                    if (e.getModifiers() == MouseEvent.BUTTON3_MASK){
+                        showPopUpColors(x,y);
+                    }
+                }else{
+                    if (e.getModifiers() == MouseEvent.BUTTON3_MASK){
+                        showPopUpColors(x,y);
+                    }
+                    if(shapesTypes.get(highlightedShapeIndex)==0){
+                        Circle c = (Circle)shapes.get(highlightedShapeIndex);
+                        if(c.includes(x, y)){
+                            highlightedShapeIndex = -1;
+                            repaint();
+                        }
+                    }else if(shapesTypes.get(highlightedShapeIndex)==1){
+                        Rect c = (Rect)shapes.get(highlightedShapeIndex);
+                        if(c.includes(x, y)){
+                            highlightedShapeIndex = -1;
+                            repaint();
+                        }
+                    }else{
+                        OwnShape c = (OwnShape)shapes.get(highlightedShapeIndex);
+                        if(c.includes(x, y)){
+                            highlightedShapeIndex = -1;
+                            repaint();
+                        }
+                    }
+                }
+                
+            }else{
+                startX = x;
+                startY = y;
+            }
+             
+        }
+
+        @Override
+        public void mouseDragged(MouseEvent e) {
+
+            doMove(e);
+        }  
+        
+        @Override
+        public void mouseReleased(MouseEvent event) {
+            endDrag = null;
+            if(masterFrame.getCurrentMode() == v.NEW_CIRCLE_MODE){
+                
+                Double r = Math.sqrt((startX - event.getX())*(startX - event.getX()) + (startY - event.getY())*(startY - event.getY()));
+                Integer oR = r.intValue();
+                Circle c = new Circle(new Point(startX-oR, startY-oR),2*r,masterFrame.getCurrentColor());
+                shapes.add(c);
+                shapesTypes.add(0);
+                shapesCount++;
+                
+                repaint();
+            }else if(masterFrame.getCurrentMode() == v.NEW_RECT_MODE){
+                
+                int rx = startX;
+                int ry = startY;
+                double width = Math.abs(startX - event.getX());
+                double height = Math.abs(startY - event.getY());
+                if(startX > event.getX()) rx = event.getX();
+                if(startY > event.getY()) ry = event.getY();
+                Rect r = new Rect(new Point(rx,ry), width, height, masterFrame.getCurrentColor());
+                shapes.add(r);
+                shapesTypes.add(1);
+                shapesCount++;
+                
+                repaint();
+            }
+           
+        }
+        
+        private void doMove(MouseEvent e) {
+            
+            int dx = e.getX() - x;
+            int dy = e.getY() - y;
+            
+            if(masterFrame.getCurrentMode() == v.NEW_CIRCLE_MODE || masterFrame.getCurrentMode() == v.NEW_RECT_MODE){
+                endDrag = new Point(e.getX(), e.getY());
+                repaint();
+            }else if(masterFrame.getCurrentMode() == v.NEW_OWN_SHAPE_MODE){
+                //do nothing;
+            }else{
+                if(highlightedShapeIndex != -1){
+                    if(shapesTypes.get(highlightedShapeIndex) == 0){
+                        Circle a = (Circle)shapes.get(highlightedShapeIndex);
+                        if(a.includes(x, y)){
+                            int cx = a.getPoint().x;
+                            int cy = a.getPoint().y;
+                            cx+=dx;
+                            cy+=dy;
+                            a.setPoint(new Point(cx,cy));
+                            shapes.set(highlightedShapeIndex, a);
+                            repaint();
+                        }
+                    }else if(shapesTypes.get(highlightedShapeIndex) == 1){
+                        Rect a = (Rect)shapes.get(highlightedShapeIndex);
+                        if(a.includes(x, y)){
+                            int cx = a.getPoint().x;
+                            int cy = a.getPoint().y;
+                            cx+=dx;
+                            cy+=dy;
+                            a.setPoint(new Point(cx,cy));
+                            shapes.set(highlightedShapeIndex, a);
+                            repaint();
+                        }
+                    }else{
+                        OwnShape a = (OwnShape)shapes.get(highlightedShapeIndex);
+                        if(a.includes(x, y)){
+                            a.moveAllPoints(dx, dy);
+                            
+                            shapes.set(highlightedShapeIndex, a);
+                            repaint();
+                        }
+                    }
+                }
+            }
+
+            x += dx;
+            y += dy;            
+        }
+    }
+    
+    class ScaleHandler implements MouseWheelListener {
+        
+        @Override
+        public void mouseWheelMoved(MouseWheelEvent e) {
+
+            doScale(e);
+        }
+        
+        private void doScale(MouseWheelEvent e) {
+            
+            int x = e.getX();
+            int y = e.getY();
+
+            if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL && highlightedShapeIndex != -1 ) {
+                for(int h = 0; h < shapesCount; h++){
+                    if(h == highlightedShapeIndex){
+                        if(shapesTypes.get(h) == 0){
+                            Circle c1 = (Circle)shapes.get(h);
+                            if(c1.includes(x,y)){
+                                float amount =  e.getWheelRotation() * 5f;
+                                double cr = c1.getR();
+                                c1.setR(cr+amount);
+                                //shapes.add(h, c1);
+                                ((Circle)shapes.get(h)).setR(cr + amount);
+                               // h = shapesCount+1;
+                                //repaint();
+                            }
+                        }else if(shapesTypes.get(h) == 1){
+
+                            Rect r1 = (Rect)shapes.get(h);
+                            if(r1.includes(x,y)){
+                                double width = r1.getWidth();
+                                double height = r1.getHeight();
+                                double amount =  e.getWheelRotation() * 5f;
+                                double proportion = height/width;
+                                r1.setWidth(width+amount);
+                                r1.setHeight(proportion*(amount) + height);
+                               // shapes.add(h, r1);
+                               ((Rect)shapes.get(h)).setWidth(width+amount);
+                               ((Rect)shapes.get(h)).setHeight(height+amount*proportion);
+                               // h = shapesCount+1;
+                                //repaint();
+                            }
+
+                        }else if(shapesTypes.get(h) == 2){
+                            int numberOfPoints = (((OwnShape)shapes.get(h)).getNumberOfPoints());
+                            List<Point> myPoints = (((OwnShape)shapes.get(h)).getPoints());
+                            int minX = (myPoints.get(0).x);
+                            int minY = (myPoints.get(0).y);
+                            int maxX = (myPoints.get(0).x);
+                            int maxY = (myPoints.get(0).y);
+                            for( int t = 1; t < numberOfPoints; t++){
+                                if(myPoints.get(t).x< minX){
+                                    minX = myPoints.get(t).x;
+                                }
+                                if(myPoints.get(t).y< minY){
+                                    minY = myPoints.get(t).y;
+                                }
+                                if(myPoints.get(t).x> maxX){
+                                    maxX = myPoints.get(t).x;
+                                }
+                                if(myPoints.get(t).y> maxY){
+                                    maxY = myPoints.get(t).y;
+                                }
+                            }
+                            int width = maxX - minX;
+                            int height = maxY - minY;
+                            float amount =  e.getWheelRotation() * 5f;
+                            List<Point> newPoints = new ArrayList();
+                            double proportion = width/height;
+                            for( int t = 0; t < numberOfPoints;t++){
+                            	Integer newX = Integer.valueOf((int) (myPoints.get(t).x + amount*(myPoints.get(t).x - minX)/width));
+                            	Integer newY = Integer.valueOf((int) (myPoints.get(t).y + amount*height*(Math.abs(myPoints.get(t).y - minY))/(width*width)));
+                                //Integer newX = intValue(myPoints.get(t).x + amount*(myPoints.get(t).x - minX)/width);
+                               // Integer newY = intValue(myPoints.get(t).y + amount*height*(Math.abs(myPoints.get(t).y - minY))/(width*width));
+                                newPoints.add(t, new Point(newX, newY));
+                            }
+                            ((OwnShape)shapes.get(h)).changeAllPoints(newPoints);
+                        }
+                    }
+                    
+                }
+               //h = shapesCount+1; 
+               repaint(); 
+            }            
+        }
+    }
+    
+    public void changeShapeColor(int shapeIndex, Color newColor){
+        highlightedShapeIndex = -1;
+        if(shapesTypes.get(shapeIndex) == 0){
+            ((Circle)shapes.get(shapeIndex)).setColor(newColor);
+            repaint();
+        }else if(shapesTypes.get(shapeIndex) == 1){
+            ((Rect)shapes.get(shapeIndex)).setColor(newColor);
+            repaint();
+            
+        }else{
+            ((OwnShape)shapes.get(shapeIndex)).setColor(newColor);
+            repaint();
+                        
+        }
+    }
+    public void showPopUpColors(int x, int y){
+        PopUpColors popUpColors = new PopUpColors(this,x, y, highlightedShapeIndex );
+        popUpColors.show(this, x, y);
+    }
+    public void drawLine(Point a, Point b){
+        lines.add(new Line(a,b));
+        linesCount++;
+        repaint();
+    }
+    
+    public void modeChanged(){
+        highlightedShapeIndex = -1;
+        //cMode = masterFrame.getCurrentMode();
+        ownShapeInDrawing = false;
+        currentOwnShape = new OwnShape();
+        lines.clear();
+        linesCount = 0;
+        startDrag = null;
+        endDrag = null;
+        repaint();
+    }
+    
+    public void deleteAllShapes(){
+        this.shapes.clear();
+        this.shapesCount = 0;
+        this.shapesTypes.clear();;
+        modeChanged();
+        repaint();
+        
+    }
+    
+    public void changeData(ArrayList newShapes, int numberOfShapes){
+        //deleteAllShapes();
+        System.out.println("and here");
+        this.shapes = newShapes;
+        this.shapesCount = numberOfShapes;
+        System.out.println("number: " + newShapes.size() );
+        for( int h1 = 0; h1 < numberOfShapes; h1++){
+                System.out.println(" shape: " + newShapes.get(h1));
+        }
+        repaint();
+    }
+}

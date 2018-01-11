@@ -1,0 +1,47 @@
+import java.awt.Container;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.JApplet;
+import javax.swing.JButton;
+import javax.swing.JPanel;
+
+class TopPanel extends JPanel{
+    MasterFrame masterFrame;
+    private JButton openButton = new JButton("open");
+    private JButton saveButton = new JButton("save");
+    private JButton clearButton = new JButton("clear");
+    private JButton infoButton = new JButton("info");
+    
+    TopPanel(MasterFrame masterFrame){
+        this.masterFrame = masterFrame;
+        openButton.addActionListener(new ActionListener(){
+                public void actionPerformed(ActionEvent e){
+                        masterFrame.openFile();
+                }
+            });
+        saveButton.addActionListener(new ActionListener(){
+                public void actionPerformed(ActionEvent e){
+                        
+                }
+            });
+        clearButton.addActionListener(new ActionListener(){
+                public void actionPerformed(ActionEvent e){
+                    masterFrame.clearAll();
+                }
+            });
+        infoButton.addActionListener(new ActionListener(){
+                public void actionPerformed(ActionEvent e){
+                        
+                }
+            });
+        this.add(openButton);
+        this.add(saveButton);
+        this.add(clearButton);
+        this.add(infoButton);
+    }  
+}
+
+public class GameFrame extends JApplet{
+	Container content = this.getContentPane();
+}
